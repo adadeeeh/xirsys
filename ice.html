@@ -1,0 +1,17 @@
+<html>
+    <head>
+        <title>GET ICE</title>
+        <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+    </head>
+    <body>
+    
+        <script>
+        
+            window.onload = () => {
+                $.post("http://localhost/getice.php", null, r => console.log(r));
+            }
+
+        </script>
+
+    </body>
+</html>
