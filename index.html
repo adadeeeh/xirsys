@@ -28,7 +28,6 @@
         var pc;
         var localUsername;
         var dataChannel;
-        var pcs = {};
 
         function displayMessage(message) {
             $('#messages')[0].innerHTML += message + "<br>";
@@ -40,11 +39,11 @@
         
         function onIce(r) {
             ice = JSON.parse(r).v;
-            // pc = new RTCPeerConnection(ice);
-            // displayMessage("peer connection state:" + pc.connectionState);
-            // pc.onicecandidate = evt => onIceCandidate(evt);
-            // pc.onconnectionstatechange = evt => displayMessage("peer connection state:" + pc.connectionState);
-            // pc.oniceconnectionstatechange = evt => displayMessage("trying to connect to peer:" + pc.iceConnectionState);
+            pc = new RTCPeerConnection(ice);
+            displayMessage("peer connection state:" + pc.connectionState);
+            pc.onicecandidate = evt => onIceCandidate(evt);
+            pc.onconnectionstatechange = evt => displayMessage("peer connection state:" + pc.connectionState);
+            pc.oniceconnectionstatechange = evt => displayMessage("trying to connect to peer:" + pc.iceConnectionState);
         }
             
         function connect() {  
@@ -65,7 +64,6 @@
         function onSocketMessage(evt) {
             var data = JSON.parse(evt.data);
             var option;
-            var pc;
             var selectElement = $("#usersSelect")[0];
             switch (data.m.o) {
                 case "peers": 
@@ -86,7 +84,6 @@
                             var desc = new RTCSessionDescription(data.p.msg);
                             var f = data.m.f.split("/");
                             var sender = f[f.length-1];
-                            pc = createNewPeerConnection(sender);
                             pc.setRemoteDescription(desc);
                             pc.ondatachannel = evt => onDataChannel(evt);
                             pc.createAnswer().then(d => onCreateAnswer(d, sender));
@@ -95,35 +92,18 @@
                             var desc = new RTCSessionDescription(data.p.msg);
                             var f = data.m.f.split("/");
                             var sender = f[f.length-1];
-                            // pc.setRemoteDescription(desc);
-                            pcs[sender].pc.setRemoteDescription(desc);
+                            pc.setRemoteDescription(desc);
                             break;
                         case "candidate":
-                            // displayMessage("you have received a candidate");
-                            var f = data.m.f.split("/");
-                            var sender = f[f.length-1];
-                            console.log("candidate", sender, data, pcs);
+                            displayMessage("you have received a candidate");
                             var candidate = new RTCIceCandidate(data.p.msg);
-                            // pc.addIceCandidate(candidate);
-                            pcs[sender].pc.addIceCandidate(candidate);
-                            // console.log("candidate");
+                            pc.addIceCandidate(candidate);
                     }
             }
         }
 
-        function callPeer(peer) {
-            var pc = createNewPeerConnection(peer);
-            var dataChannel = pc.createDataChannel("data");
-            pcs[peer].dc = dataChannel;
-            // displayMessage("you are the caller...calling " + peer);
-            // dataChannel = pc.createDataChannel("data");
-            setDataChannelHandlers(dataChannel);
-            pc.createOffer().then(d => onCreateOffer(d, peer));
-        }
-
         function onCreateOffer(d, peer) {
-            pcs[peer].pc.setLocalDescription(d);
-            // pc.setLocalDescription(d);
+            pc.setLocalDescription(d);
             var pkt = {
                 t: "u", 
                 m: {
@@ -137,9 +117,8 @@
         }
 
         function onCreateAnswer(d, peer) {
-            // displayMessage("you are the answerer...you are answering " + peer);
-            // pc.setLocalDescription(d);
-            pcs[peer].pc.setLocalDescription(d);
+            displayMessage("you are the answerer...you are answering " + peer);
+            pc.setLocalDescription(d);
             var pkt = {
                 t: "u", 
                 m: {
@@ -153,10 +132,9 @@
         }
 
         function onIceCandidate(evt) {
-            // displayMessage("you are sending a candidate");
-            var remoteUsername = getUsernameByRemoteDesccription(evt.target.remoteDescription.sdp);
+            displayMessage("you are sending a candidate");
             var candidate = evt.candidate;
-            if (evt.candidate != null && remoteUsername != null) {
+            if (evt.candidate != null) {
                 var cPkt = {
                     type: "candidate",
                     sdpMLineIndex: candidate.sdpMLineIndex,
@@ -175,6 +153,13 @@
             }
         }
 
+        function callPeer(peer) {
+            displayMessage("you are the caller...calling " + peer);
+            dataChannel = pc.createDataChannel("data");
+            setDataChannelHandlers(dataChannel);
+            pc.createOffer().then(d => onCreateOffer(d, peer));
+        }
+
         function setDataChannelHandlers(dc) {
             dc.onmessage = evt => onDataMessage(evt);
             dc.onopen = evt => onDataChannelOpen(evt);
@@ -186,34 +171,16 @@
         }
 
         function onDataChannel(evt) {
-            var dataChannel = evt.channel;
-            var keys = Object.keys(pcs);
-            var comp;
-            var localDescription;
-            var remoteDescription;
-            for (var i = 0; i < keys.length; i++) {
-                comp = pcs[keys[i]];
-                if (evt.currentTarget.localDescription.sdp == comp.pc.localDescription.sdp) {
-                    comp.dc = dataChannel;
-                }
-            }
-            //  dataChannel = evt.channel;
+            dataChannel = evt.channel;
             setDataChannelHandlers(dataChannel);
         }
 
         function send() {
             var messageElement = $('#newMessage')[0];
             displayMessage("you said: " + messageElement.value);
-            messageElement.value = {f: localUsername, msg: messageElement.value};
+            var message = {f: localUsername, msg: messageElement.value};
             messageElement.value = "";
-            var dataChannel;
-            var keys = Object.keys(pcs);
-            var comp;
-            for (var i = 0; i < keys.length; i++) {
-                comp = pcs[keys[i]];
-                dataChannel = comp.dc;
-                dataChannel.send(JSON.stringify(message));
-            }
+            dataChannel.send(JSON.stringify(message));
         }
 
         function onDataMessage(evt) {
@@ -221,27 +188,27 @@
             displayMessage(messageObj.f + " said: " + messageObj.msg);
         }
 
-        function createNewPeerConnection(username) {
-            var pc = new RTCPeerConnection(ice);
-            pc.ondatachannel = evt => onDataChannel(evt);
-            pc.onicecandidate = candidate => onIceCandidate(candidate);
-            pc.oniceconnectionstatechange = evt => console.log("ice connection state ", evt);
-            pcs[username] = {pc: pc, dc: null};
-            //console.log("setting new peer connection: ", pcs);
-            return pc;
-        }
+        // function createNewPeerConnection(username) {
+        //     var pc = new RTCPeerConnection(ice);
+        //     pc.ondatachannel = evt => onDataChannel(evt);
+        //     pc.onicecandidate = candidate => onIceCandidate(candidate);
+        //     pc.oniceconnectionstatechange = evt => console.log("ice connection state ", evt);
+        //     pcs[username] = {pc: pc, dc: null};
+        //     //console.log("setting new peer connection: ", pcs);
+        //     return pc;
+        // }
 
-        function getUsernameByRemoteDesccription(sdp) {
-            var keys = Object.keys(pcs);
-            var pc;
-            for (var i = 0; i < keys.length; i++) {
-                pc = pcs[keys[i]].pc;
-                if (pc.remoteDescription.sdp = sdp) {
-                    return keys[i];
-                }
-            }
-            return null;
-        }
+        // function getUsernameByRemoteDesccription(sdp) {
+        //     var keys = Object.keys(pcs);
+        //     var pc;
+        //     for (var i = 0; i < keys.length; i++) {
+        //         pc = pcs[keys[i]].pc;
+        //         if (pc.remoteDescription.sdp = sdp) {
+        //             return keys[i];
+        //         }
+        //     }
+        //     return null;
+        // }
 
     </script>
 
