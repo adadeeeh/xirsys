@@ -15,8 +15,8 @@
         </div>
 
         <div>
-            your message: <input type="text" id="newMessage" disabled/>
-            <button id="sendButton" onclick="send()" disabled>send</button>
+            your message: <input type="text" id="newMessage" disabled />
+            <button id="sendButton" onclick="send()" disabled >send</button>
         </div>
 
         <div id="messages"></div>
@@ -34,11 +34,13 @@
         }
         
         window.onload = () => {
-            $.post("http://localhost/getice.php",null, r => onIce(r));
+            $.post("http://localhost/getice.php", null, r => onIce(r));
         }
         
         function onIce(r) {
-            ice = JSON.parse(r).v;
+            ice = JSON.parse(r).v.iceServers;
+            ice = ice.splice(0, 4);
+            console.log(ice);
             pc = new RTCPeerConnection(ice);
             displayMessage("peer connection state:" + pc.connectionState);
             pc.onicecandidate = evt => onIceCandidate(evt);
@@ -63,6 +65,7 @@
 
         function onSocketMessage(evt) {
             var data = JSON.parse(evt.data);
+            console.log(data);
             var option;
             var selectElement = $("#usersSelect")[0];
             switch (data.m.o) {
@@ -98,7 +101,9 @@
                             displayMessage("you have received a candidate");
                             var candidate = new RTCIceCandidate(data.p.msg);
                             pc.addIceCandidate(candidate);
+                            break;
                     }
+                    
             }
         }
 
@@ -107,7 +112,7 @@
             var pkt = {
                 t: "u", 
                 m: {
-                    f: "sample/" + localUsername, 
+                    f: "sample2/" + localUsername, 
                     o: "message",
                     t: peer
                 }, 
@@ -122,7 +127,7 @@
             var pkt = {
                 t: "u", 
                 m: {
-                    f: "sample/" + localUsername, 
+                    f: "sample2/" + localUsername, 
                     o: "message",
                     t: peer
                 }, 
@@ -144,11 +149,12 @@
                 var pkt = {
                     t: "u",
                     m: {
-                        f: "sample/" + localUsername,
+                        f: "sample2/" + localUsername,
                         o: 'message'
                     },
                     p: {msg:cPkt}
                 }
+                console.log(pkt);
                 socket.send(JSON.stringify(pkt));
             }
         }
@@ -178,7 +184,10 @@
         function send() {
             var messageElement = $('#newMessage')[0];
             displayMessage("you said: " + messageElement.value);
-            var message = {f: localUsername, msg: messageElement.value};
+            var message = {
+                f: localUsername,
+                msg: messageElement.value
+            };
             messageElement.value = "";
             dataChannel.send(JSON.stringify(message));
         }
@@ -187,28 +196,6 @@
             var messageObj = JSON.parse(evt.data);
             displayMessage(messageObj.f + " said: " + messageObj.msg);
         }
-
-        // function createNewPeerConnection(username) {
-        //     var pc = new RTCPeerConnection(ice);
-        //     pc.ondatachannel = evt => onDataChannel(evt);
-        //     pc.onicecandidate = candidate => onIceCandidate(candidate);
-        //     pc.oniceconnectionstatechange = evt => console.log("ice connection state ", evt);
-        //     pcs[username] = {pc: pc, dc: null};
-        //     //console.log("setting new peer connection: ", pcs);
-        //     return pc;
-        // }
-
-        // function getUsernameByRemoteDesccription(sdp) {
-        //     var keys = Object.keys(pcs);
-        //     var pc;
-        //     for (var i = 0; i < keys.length; i++) {
-        //         pc = pcs[keys[i]].pc;
-        //         if (pc.remoteDescription.sdp = sdp) {
-        //             return keys[i];
-        //         }
-        //     }
-        //     return null;
-        // }
 
     </script>
 
