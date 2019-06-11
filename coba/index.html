@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+    <title>Coba xirsys</title>
+</head>
+<body>
+
+        <div>
+            username: <input type="text" id="username" />
+            <button id="connectButton" onclick="connect()">connect</button>
+        </div>
+
+        <div>
+            your message: <input type="text" id="newMessage" disabled />
+            <button id="sendButton" onclick="send()" disabled >send</button>
+        </div>
+
+        <div id="messages"></div>
+
+    <script>
+        var token;
+        var socket;
+        var ice;
+        var pc;
+        var localUsername;
+        var dataChannel;
+
+        function displayMessage(message) {
+            $('#messages')[0].innerHTML += message + "<br>";
+        }
+        
+        window.onload = () => {
+            $.post("http://localhost/getice.php", null, r => onIce(r));
+        }
+        
+        function onIce(r) {
+            ice = JSON.parse(r).v.iceServers;
+            ice = ice.splice(0, 4);
+            console.log(ice);
+            pc = new RTCPeerConnection(ice);
+            displayMessage("peer connection state:" + pc.connectionState);
+            pc.onicecandidate = evt => onIceCandidate(evt);
+            pc.onconnectionstatechange = evt => displayMessage("peer connection state:" + pc.connectionState);
+            pc.oniceconnectionstatechange = evt => displayMessage("trying to connect to peer:" + pc.iceConnectionState);
+        }
+            
+        function connect() {  
+            localUsername = $('#username')[0].value;
+            $.post("http://localhost/gettoken.php", {username: localUsername}, r => getHost(r));
+        }
+        
+        function getHost(r) {token = JSON.parse(r).v;
+            $.post("http://localhost/gethost.php", {username: localUsername}, r => openSocket(r));
+        }
+        
+        function openSocket(r) {
+            var host = JSON.parse(r).v;
+            socket = new WebSocket(host + "/v2/" + token);
+            socket.addEventListener("message", onSocketMessage);
+        }
+
+        function onSocketMessage(evt) {
+            var data = JSON.parse(evt.data);
+            console.log(data);
+            var option;
+            var selectElement = $("#usersSelect")[0];
+            switch (data.m.o) {
+                case "peers": 
+                    var users = data.p.users;
+                    for(i = 0; i < users.length; i++) {
+                        displayMessage("user in chat:" + users[i]);
+                    }
+                    break;
+                case "peer_connected":
+                    var f = data.m.f.split("/");
+                    var joining = f[f.length-1];
+                    displayMessage("new user joined:" + joining)
+                    callPeer(joining);
+                    break;
+                case "message":
+                    switch(data.p.msg.type) {
+                        case "offer":
+                            var desc = new RTCSessionDescription(data.p.msg);
+                            var f = data.m.f.split("/");
+                            var sender = f[f.length-1];
+                            pc.setRemoteDescription(desc);
+                            pc.ondatachannel = evt => onDataChannel(evt);
+                            pc.createAnswer().then(d => onCreateAnswer(d, sender));
+                            break;
+                        case "answer":
+                            var desc = new RTCSessionDescription(data.p.msg);
+                            var f = data.m.f.split("/");
+                            var sender = f[f.length-1];
+                            pc.setRemoteDescription(desc);
+                            break;
+                        case "candidate":
+                            displayMessage("you have received a candidate");
+                            var candidate = new RTCIceCandidate(data.p.msg);
+                            pc.addIceCandidate(candidate);
+                            break;
+                    }
+                    
+            }
+        }
+
+        function onCreateOffer(d, peer) {
+            pc.setLocalDescription(d);
+            var pkt = {
+                t: "u", 
+                m: {
+                    f: "sample2/" + localUsername, 
+                    o: "message",
+                    t: peer
+                }, 
+                p: {msg:d}
+            };
+            socket.send(JSON.stringify(pkt));
+        }
+
+        function onCreateAnswer(d, peer) {
+            displayMessage("you are the answerer...you are answering " + peer);
+            pc.setLocalDescription(d);
+            var pkt = {
+                t: "u", 
+                m: {
+                    f: "sample2/" + localUsername, 
+                    o: "message",
+                    t: peer
+                }, 
+                p: {msg:d}
+            };
+            socket.send(JSON.stringify(pkt));
+        }
+
+        function onIceCandidate(evt) {
+            displayMessage("you are sending a candidate");
+            var candidate = evt.candidate;
+            if (evt.candidate != null) {
+                var cPkt = {
+                    type: "candidate",
+                    sdpMLineIndex: candidate.sdpMLineIndex,
+                    sdpMid: candidate.sdpMid,
+                    candidate: candidate.candidate
+                };
+                var pkt = {
+                    t: "u",
+                    m: {
+                        f: "sample2/" + localUsername,
+                        o: 'message'
+                    },
+                    p: {msg:cPkt}
+                }
+                console.log(pkt);
+                socket.send(JSON.stringify(pkt));
+            }
+        }
+
+        function callPeer(peer) {
+            displayMessage("you are the caller...calling " + peer);
+            dataChannel = pc.createDataChannel("data");
+            setDataChannelHandlers(dataChannel);
+            pc.createOffer().then(d => onCreateOffer(d, peer));
+        }
+
+        function setDataChannelHandlers(dc) {
+            dc.onmessage = evt => onDataMessage(evt);
+            dc.onopen = evt => onDataChannelOpen(evt);
+        }
+
+        function onDataChannelOpen(evt) {
+            $("#newMessage")[0].disabled = false;
+            $("#sendButton")[0].disabled = false;
+        }
+
+        function onDataChannel(evt) {
+            dataChannel = evt.channel;
+            setDataChannelHandlers(dataChannel);
+        }
+
+        function send() {
+            var messageElement = $('#newMessage')[0];
+            displayMessage("you said: " + messageElement.value);
+            var message = {
+                f: localUsername,
+                msg: messageElement.value
+            };
+            messageElement.value = "";
+            dataChannel.send(JSON.stringify(message));
+        }
+
+        function onDataMessage(evt) {
+            var messageObj = JSON.parse(evt.data);
+            displayMessage(messageObj.f + " said: " + messageObj.msg);
+        }
+
+    </script>
+
+</body>
+</html>
