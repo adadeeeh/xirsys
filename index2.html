@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Document</title>
+</head>
+<body>
+    
+    <script src="https://cdn.pubnub.com/sdk/javascript/pubnub.4.24.1.js"></script>
+    <script>
+        (function(){
+            pubnub = new PubNub({
+                publishKey : 'pub-c-a6c45271-0730-408c-9ef2-7f501e78c398',
+                subscribeKey : 'sub-c-605f18ec-81e2-11e9-abf5-3aee3d8b0253'
+            })
+            
+            function publishSampleMessage() {
+                console.log("Since we're publishing on subscribe connectEvent, we're sure we'll receive the following publish.");
+                var publishConfig = {
+                    channel : "hello_world",
+                    message: { 
+                        title: "greeting",
+                        description: "hello world!"
+                    }
+                }
+                pubnub.publish(publishConfig, function(status, response) {
+                    console.log(status, response);
+                })
+            }
+            
+            pubnub.addListener({
+                status: function(statusEvent) {
+                    if (statusEvent.category === "PNConnectedCategory") {
+                        publishSampleMessage();
+                    }
+                },
+                message: function(msg) {
+                    console.log(msg.message.title);
+                    console.log(msg.message.description);
+                },
+                presence: function(presenceEvent) {
+                    // handle presence
+                }
+            })      
+            console.log("Subscribing..");
+            pubnub.subscribe({
+                channels: ['hello_world'] 
+            });
+        })()
+    </script>
+
+</body>
+</html>
