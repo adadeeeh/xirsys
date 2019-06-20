@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css">
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script> 
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js"></script>
+    <title>Who's online?</title>
+</head>
+<body>
+    
+    <div>
+        <button onclick="channelStatus()">Update Channel Status</button>
+    </div>
+
+    <div id="jumlahOnline">
+        
+    </div>
+
+    <div id="orangOnline">
+
+    </div>
+
+    <script src="https://cdn.pubnub.com/sdk/javascript/pubnub.4.24.1.js"></script>
+    <script>
+        (function() {
+            var nameChannel = 'channel_1';
+            var subKey = 'sub-c-77245466-8b3d-11e9-9769-e24cdeae5ee1';
+            var pubKey = 'pub-c-013deaf3-4b9e-4e36-9491-2267dc769f03';
+
+            pubnub = new PubNub({
+                subscribeKey: subKey,
+                publishKey: pubKey
+            })
+
+            pubnub.hereNow(
+                {
+                    channels: [nameChannel],
+                    includeUUIDs: true,
+                    includeState: true
+                },
+                function(status, response) {
+                    //console.log(response.channels.channel_1.occupants);
+                    //occupants = response.channels.channel_1.occupants;
+                    
+                    occupancy = response.channels.channel_1.occupancy;
+                    document.getElementById('jumlahOnline').innerHTML = 'Jumlah orang online: ' + occupancy;
+                    document.getElementById('orangOnline').innerHTML = 'Daftar orang online: ';
+                    
+                    // var i;
+                    // for (i in occupants) {
+                    //     //document.getElementById('checkOnline').innerHTML += 'Daftar online: ' + occupants[i].uuid + '<br>';
+                    //     document.getElementById('orangOnline').innerHTML += occupants[i].uuid + ', ';
+                    // }
+
+                    response.channels.channel_1.occupants.forEach(
+                        function(item) {
+                            document.getElementById('orangOnline').innerHTML += item.uuid + ', ';                        }
+                    );
+                }
+            )
+        
+        })()
+    </script>
+
+    <script type="text/javascript">
+        var nameChannel = 'channel_1';
+        function channelStatus() {
+            pubnub.hereNow(
+                {
+                    channels: [nameChannel],
+                    includeUUIDs: true,
+                    includeState: true
+                },
+                function(status, response) {
+                    console.log(response.channels.channel_1.occupants);
+                    //occupants = response.channels.channel_1.occupants;
+                    
+                    occupancy = response.channels.channel_1.occupancy;
+                    console.log(occupancy);
+                    document.getElementById('jumlahOnline').innerHTML = 'Jumlah orang online: ' + occupancy;
+                    document.getElementById('orangOnline').innerHTML = 'Daftar orang online: ';
+                    
+                    // var i;
+                    // for (i in occupants) {
+                    //     document.getElementById('orangOnline').innerHTML += occupants[i].uuid + ', ';
+                    //     console.log(occupants[i].uuid);
+                    // }
+
+                    response.channels.channel_1.occupants.forEach(
+                        function(item) {
+                            document.getElementById('orangOnline').innerHTML += item.uuid + ', ';                        }
+                    );
+                }
+            )
+        }
+    </script>
+
+</body>
+</html>

@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css">
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script> 
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js"></script>
+    <title>Simple</title>
+</head>
+<body>
+    
+    <div>
+        Name: <span id="name"></span>
+    </div>
+
+    <div>
+        Message: <input type="text" id="message">
+        <button id="send-button" disabled>Send</button> Online <span id="totalOnline"></span>
+    </div>
+
+    <div>
+        <button id="leave-button">Leave</button>
+        <button id="online-button" onclick="window.location.href = 'online.html';">Who's online?</button>
+        <button data-toggle='modal' data-target='#myModal'>State</button>
+    </div>
+
+    <div id="messages"></div>
+
+    <!-- modal -->
+    <div class="modal" id="myModal">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h4 class="modal-title">Data diri</h4>
+                    <button class="close" data-dismiss='modal'></button>
+                    <span aria-hidden="true">&times;</span>
+                </div>
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-sm-12">
+                            <label for="nameState"></label>Name:</label>
+                            <input type="text" id="nameState">
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-sm-12">
+                            <label for="ageState">Age:</label>
+                            <input type="text" id="ageState">
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-sm-12">
+                            <label for="adsressState">Address:</label>
+                            <input type="text" id="addressState">
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button data-dismiss="modal">Close</button>
+                    <button data-dismiss='modal' type='button' id="updateProfileButton">Save changes</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.pubnub.com/sdk/javascript/pubnub.4.24.1.js"></script>
+    <script>
+        (function() {
+            var nameChannel = 'channel_1';
+            var subKey = 'sub-c-77245466-8b3d-11e9-9769-e24cdeae5ee1';
+            var pubKey = 'pub-c-013deaf3-4b9e-4e36-9491-2267dc769f03';
+            var myUuid = localStorage.getItem(subKey + 'uuid');
+            var totalOnline, baruOnline;
+
+            var name = window.location.search.substring(1).split('=')[1];
+            localStorage.setItem('name', name);
+
+            var sendButton = document.querySelector("#send-button");
+            sendButton.onclick = send;
+
+            var leaveButton = document.querySelector('#leave-button');
+            leaveButton.onclick = leave;
+
+            //console.log(myUuid);
+
+            if (myUuid === null && name === null) {
+                //myUuid = PubNub.generateUUID();
+                //console.log(myUuid);
+                var name = prompt('Enter your name');
+                localStorage.setItem('name', name);
+            }
+            else {
+                name = localStorage.getItem('name');
+            }
+            document.getElementById('name').innerHTML = name;
+
+            function displayMessage(message) {
+                document.getElementById('messages').innerHTML += message + '<br>';
+            }
+
+            pubnub = new PubNub({
+                subscribeKey: subKey,
+                publishKey: pubKey,
+                uuid: name
+            })
+
+            pubnub.subscribe({
+                channels: [nameChannel],
+                withPresence: true
+            })
+
+            userState = {
+                name: 'unknown',
+                age: 'unknown',
+                address: 'unknown'
+            };
+
+            if (localStorage.getItem('profileExist')) {
+                userState.name = localStorage.profileName;
+                userState.age = localStorage.profileAge;
+                userState.address = localStorage.profileAddress;
+                //console.log(userState.name);
+            }
+
+            function stateUpdate() {
+                var nameState = document.querySelector('#nameState');
+                var ageState = document.querySelector('#ageState');
+                var addressState = document.querySelector('#addressState');
+
+                userState.name = nameState.value;
+                userState.age = ageState.value;
+                userState.address = addressState.value;
+
+                localStorage.setItem('profileName', nameState.value);
+                localStorage.setItem('profileAge', ageState.value);
+                localStorage.setItem('profileAddress', addressState.value);
+                localStorage.setItem('profileExist', true);
+
+                pubnub.setState(
+                    {
+                        state: userState,
+                        channels: [nameChannel]
+                    },
+                    function(state, response) {
+                        //console.log(state, response);
+                    }
+                );
+            }
+
+            var updateStateButton = document.querySelector('#updateProfileButton');
+            updateStateButton.onclick = stateUpdate;
+
+            if (userState.name === 'unknown') {
+                // userhas not set his state.
+                $('#myModal').modal('show');
+            } 
+            // else {
+            //     var nameState = document.querySelector('#nameState');
+            //     nameState.value = userState.name;
+
+            //     pubnub.setState(
+            //         {
+            //             state: userState,
+            //             channels: [nameChannel]
+            //         },
+            //         function(state, response) {
+            //             console.log(state, response);
+            //         }
+            //     );
+                 
+            // }
+
+            function send() {
+                var msgText = document.getElementById('message');
+                var msg = {
+                    from: name,
+                    text: msgText.value
+                };
+                pubnub.publish(
+                {
+                    message: msg,
+                    channel: nameChannel
+                },
+                function(status, response) {
+                    console.log(status, response);
+                })
+            }
+
+            function leave() {
+                pubnub.unsubscribe({
+                    channels: [nameChannel]
+                })
+            }
+
+            pubnub.addListener({
+                message: function(msgEvent) {
+                    var userName = msgEvent.message.from;
+                    var message = msgEvent.message.text;
+                    var time = formatTimeToken(msgEvent.timetoken);
+                    //console.log(msgEvent.message);
+                    //document.getElementById('messages').innerHTML = message;
+                    displayMessage(userName + ' said ' + message + ' at ' + time);
+                },
+                presence: function(presenceEvent) {
+                    //console.log(presenceEvent);
+                    //console.log(presenceEvent.action);
+                    //console.log(presenceEvent.occupancy + ' orang online');
+                    if (presenceEvent.action === 'join') {
+                        console.log(presenceEvent.uuid + ' ' + presenceEvent.action);
+                        //console.log(presenceEvent.occupancy + ' orang online');
+                    } 
+                    else if (presenceEvent.action === 'timeout' || presenceEvent.action === 'leave') {
+                        console.log(presenceEvent.uuid + ' ' + presenceEvent.action);
+                    } 
+                    else if (presenceEvent.action === 'state-change') {
+                        console.log(presenceEvent.uuid + ' ' + presenceEvent.action + ' to');
+                        console.log(presenceEvent.state);
+                    }
+                    
+                    baruOnline = presenceEvent.occupancy;
+                    document.getElementById('totalOnline').innerHTML = baruOnline;
+                    if (baruOnline > 1) { //buat yang baru join
+                        document.getElementById('send-button').disabled = false;
+                    } else {
+                        document.getElementById('send-button').disabled = true;
+                    }
+                },
+                status: function(statusEvent) {
+                    //console.log(statusEvent);
+                    if (statusEvent.category === 'PNConnectedCategory') {
+                        pubnub.hereNow(
+                            {
+                                channels: [nameChannel],
+                                includeUUIDs: true,
+                                includeState: true
+                            },
+                            function(status, response) {
+                                //console.log(status, response);
+                                // console.log(response.channels);
+                                //console.log(response.channels.channel_1.occupants);
+                                totalOnline = response.totalOccupancy;
+                                //console.log(response.totalOccupancy);
+                                if (baruOnline = totalOnline) { //buat refresh page
+                                    document.getElementById('totalOnline').innerHTML = totalOnline;
+                                    //console.log(totalOnline + ' orang online');
+                                    if (baruOnline > 1) {
+                                        document.getElementById('send-button').disabled = false;
+                                    } else {
+                                        document.getElementById('send-button').disabled = true;
+                                    }
+                                }
+                            }
+                        )
+                    }
+                    if (statusEvent.operation === 'PNUnsubscribeOperation') {
+                        localStorage.removeItem('name');
+                        localStorage.removeItem(subKey + 'uuid');
+                        localStorage.removeItem('profileName');
+                        localStorage.removeItem('profileExist');
+                        window.location = 'login3.html';
+                    }
+                }
+
+            })
+
+            //get chat history
+            pubnub.history({
+                    channel: nameChannel,
+                    count: 10,
+                    stringifiedTimeToken: false
+                },
+                function(status, response) {
+                    //console.log(status, response);
+                    response.messages.forEach(
+                        function(item) {
+                            userHistory = item.entry.from;
+                            chatHistory = item.entry.text;
+                            time = formatTimeToken(item.timetoken);
+                            displayMessage(userHistory + ' said ' + chatHistory + ' at ' + time);
+                        }
+                    )
+                }
+            );
+
+            //format timetoken
+            function formatTimeToken(timeToken) {
+                var date = new Date(timeToken/10000);
+                var month = date.getMonth()+1;
+                var day = date.getDate();
+                var year = date.getFullYear();
+                var hours = date.getHours();
+                var minutes = "0" + date.getMinutes();
+                var seconds = "0" + date.getSeconds();
+
+                var formattedTime = 
+                day + '-' + month + '-' + year + " " + 
+                hours + ':' + 
+                minutes.substr(minutes.length-2) + ':' + 
+
+                seconds.substr(seconds.length-2);
+                return formattedTime;     
+            }
+            
+        })()
+    </script>
+
+        <!-- Chat in 10 lines of JavaScript code using PubNub JavaScript V4 SDK
+        <p>Enter chat and press enter.</p>
+        <input id="input" placeholder="Your Message Here"/>
+        <p>Chat Output:<p>
+        <div id="box"></div>
+        <script src="https://cdn.pubnub.com/sdk/javascript/pubnub.4.23.0.min.js"></script>
+        <script>(function(){
+            var pubnub = new PubNub({
+                publishKey : 'pub-c-013deaf3-4b9e-4e36-9491-2267dc769f03',
+                subscribeKey : 'sub-c-77245466-8b3d-11e9-9769-e24cdeae5ee1'
+            }); // Your PubNub keys here. Get them from https://dashboard.pubnub.com.
+            var box = document.getElementById("box");
+            var input = document.getElementById("input");
+            var channel = 'chat';
+
+            pubnub.subscribe({
+                channels: [channel]
+            }); // Subscribe to a channel.
+
+            pubnub.addListener({
+                message: function(m) {
+                box.innerHTML = (''+m.message).replace( /[<>]/g, '' ) + '<br>' + box.innerHTML; // Add message to page.
+            }});
+
+            input.addEventListener('keypress', function (e) {
+                (e.keyCode || e.charCode) === 13 && pubnub.publish({ // Publish new message when enter is pressed. 
+                    channel : channel,
+                    message : input.value,
+                    x : (input.value='')
+                });
+            });
+        })();
+        </script> -->
+</body>
+</html>

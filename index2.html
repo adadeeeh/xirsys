@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Document</title>
+</head>
+<body>
+    
+    <script src="https://cdn.pubnub.com/sdk/javascript/pubnub.4.24.1.js"></script>
+    <script>
+        (function(){
+
+            var nameChannel = 'Channel-1';
+            var subKey = 'sub-c-77245466-8b3d-11e9-9769-e24cdeae5ee1';
+            var pubKey = 'pub-c-013deaf3-4b9e-4e36-9491-2267dc769f03';
+            var myUuid = localStorage.getItem(subKey + 'uuid');
+            
+            if (myUuid === null) {
+                myUuid = PubNub.generateUUID();
+                console.log(myUuid);
+            }
+
+            pubnub = new PubNub({
+                publishKey : pubKey,
+                subscribeKey : subKey
+            })
+            
+            function publishSampleMessage() {
+                console.log("Since we're publishing on subscribe connectEvent, we're sure we'll receive the following publish.");
+                var publishConfig = {
+                    channel : nameChannel,
+                    message: { 
+                        title: 'greeting',
+                        description: 'hello world!'
+                    }
+                }
+                pubnub.publish(publishConfig, function(status, response) {
+                    console.log(status, response);
+                })
+            }
+            
+            pubnub.addListener({
+                status: function(statusEvent) {
+                    if (statusEvent.category === 'PNConnectedCategory') {
+                        publishSampleMessage();
+                        console.log(statusEvent);
+                        // pubnub.hereNow(
+                        //     {
+                        //         channels: [nameChannel],
+                        //         includeUUIDs: true,
+                        //         includeState: true
+                        //     },
+                        //     function (status, response) {
+                        //         console.log(status, response);
+                        //         //console.log(response.channels[nameChannel].occupancy);
+                        //     }
+                        // );
+                    }
+                },
+                message: function(msg) {
+                    console.log(msg.message.title);
+                    console.log(msg.message.description);
+                    console.log(msg.channel);
+                },
+                presence: function(presenceEvent) {
+                    // console.log(presenceEvent.occupancy);
+                }
+            })      
+            console.log('Subscribing..');
+            pubnub.subscribe({
+                channels: [nameChannel] 
+            });
+        })()
+    </script>
+
+</body>
+</html>
