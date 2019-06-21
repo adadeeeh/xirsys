@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css">
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script> 
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js"></script>
+    <title>PubNub</title>
+</head>
+<body>
+    <div>
+        Name: <span id="name"></span>
+    </div>
+
+    <div>
+        Message: <input type="text" id="message">
+        <button id="send-button" disabled>Send</button> Online <span id="totalOnline"></span>
+    </div>
+
+    <div>
+        <button id="leave-button">Leave</button>
+        <button id="online-button" onclick="window.location.href = 'online.html';">Who's online?</button>
+    </div>
+
+    <div id="messages"></div>
+
+    <script src="https://cdn.pubnub.com/sdk/javascript/pubnub.4.24.1.js"></script>
+    <script>
+        (function() {
+            var nameChannel = 'channel_2';
+            var subKey = 'sub-c-77245466-8b3d-11e9-9769-e24cdeae5ee1';
+            var pubKey = 'pub-c-013deaf3-4b9e-4e36-9491-2267dc769f03';
+            var myUuid = localStorage.getItem(subKey + 'uuid');
+            var totalOnline, baruOnline, isOfferer;
+            var startHistory = 0;
+            var endHistory = 0;
+
+            var sendButton = document.querySelector("#send-button");
+            //sendButton.onclick = send;
+
+            var leaveButton = document.querySelector('#leave-button');
+            leaveButton.onclick = leave;
+
+            if (myUuid === null) {
+                //myUuid = PubNub.generateUUID();
+                //console.log(myUuid);
+                var name = prompt('Enter your name');
+                localStorage.setItem('name', name);
+            }
+            else {
+                name = localStorage.getItem('name');
+            }
+            document.getElementById('name').innerHTML = name;
+
+            function displayMessage(message) {
+                document.getElementById('messages').innerHTML += message + '<br>';
+            }
+
+            configuration = {
+                iceServers: [{
+                    urls: 'stun:stun.l.google.com:19302'
+                }]
+            }
+            var pc, dataChannel;
+
+            pubnub = new PubNub({
+                subscribeKey: subKey,
+                publishKey: pubKey,
+                uuid: name
+            })
+
+            pubnub.subscribe({
+                channels: [nameChannel],
+                withPresence: true
+            })
+
+            function sendSignallingMessage(msg) {
+                pubnub.publish({
+                    channel: nameChannel,
+                    message: msg
+                },
+                function(status, response) {
+                    //console.log(status, response);
+
+                    // get time history
+                    // if (startHistory === 0) {
+                    //     startHistory = response;
+                    //     console.log('start adalah ' + startHistory.timetoken);
+                    // }
+                    // if (response.timetoken > startHistory.timetoken) {
+                    //     endHistory = response;
+                    //     console.log('end adalah ' + endHistory.timetoken);
+                    // }
+                })
+            }
+
+            pubnub.addListener({
+                message: function(msgEvent) {
+                    // console.log(msgEvent);
+                    console.log(msgEvent.message, msgEvent.publisher);
+                    if (localStorage.getItem(name) === msgEvent.publisher) {
+                        return;
+                    }
+                    if (startHistory === 0) {
+                        startHistory = msgEvent.timetoken;
+                        console.log('start adalah ' + startHistory);
+                    }
+                    if (msgEvent.timetoken > startHistory) {
+                        endHistory = msgEvent.timetoken;
+                        console.log('end adalah ' + endHistory);
+                    }
+                    // if (msgEvent.message.sdp) {
+                    //     pc.setRemoteDescription(new RTCSessionDescription(msgEvent.message.sdp), () => {
+                    //         console.log('pc.remoteDescription.type', pc.remoteDescription.type);
+                    //         if (pc.remoteDescription.type === 'offer') {
+                    //             console.log('Answering offer');
+                    //             pc.createAnswer(localDescCreated, error => console.error(error));
+                    //         }
+                    //     }, error => console.error(error));
+                    // }
+                    // else if (msgEvent.message.candidate) {
+                    //     pc.addIceCandidate(new RTCIceCandidate(msgEvent.message.candidate));
+                    // }
+                    //console.log(pc.remoteDescription.type);
+                },
+                presence: function(presenceEvent) {
+                    if (presenceEvent.action === 'join') {
+                        console.log(presenceEvent.occupancy);
+                        if (presenceEvent.occupancy >= 3) {
+                            return alert('The room is full');
+                        }
+                        // if (presenceEvent.occupancy === 1) {
+                        //     isOfferer = 'waiter';
+                        //     startWebRTC(isOfferer);
+                        // }
+                        // else {
+                        //     isOfferer = 'offerer';
+                        //     startWebRTC(isOfferer);
+                        // }
+                        isOfferer = presenceEvent.occupancy === 2;
+                        startWebRTC(isOfferer);
+                    }
+                },
+                status: function(statusEvent) {
+                    if (statusEvent.category === 'PNConnectedCategory') {
+                        console.log('Connected to signalling server');
+                    }
+
+                    if (statusEvent.operation === 'PNUnsubscribeOperation') {
+                        localStorage.removeItem('name');
+                        localStorage.removeItem(subKey + 'uuid');
+                        localStorage.removeItem('profileName');
+                        localStorage.removeItem('profileExist');
+                        window.location = 'login3.html';
+                    }
+                }
+            })
+
+            function startWebRTC(isOfferer) {
+                console.log('Starting webrtc as ', isOfferer ? 'offerer' : 'waiter');
+                pc = new RTCPeerConnection(configuration);
+
+                console.log(pc);
+
+                // console.log(pc);
+                //console.log(pc.remoteDescription.sdp);
+                pc.onicecandidate = event => {
+                    if (event.candidate) {
+                        sendSignallingMessage({'candidate': event.candidate});
+                    }
+                };
+
+                if (isOfferer) {
+                    pc.onnegotiationneeded = () => {
+                        pc.createOffer(localDescCreated, error => console.error(error));
+                    }
+                    dataChannel = pc.createDataChannel('chat');
+                    setupDataChannel();
+                } else {
+                    pc.ondatachannel = event => {
+                        dataChannel = event.channel;
+                        setupDataChannel();
+                    }
+                }
+
+                startListeningToSignals();
+            }
+
+            function startListeningToSignals() {
+                setTimeout(() => {
+                    // pubnub.history(
+                    // {
+                    //     channel: nameChannel,
+                    //     start: startHistory.timetoken,
+                    //     end: endHistory.timetoken,
+                    //     count: 10
+                    // },
+                    // function (status, response) {
+                    //     console.log(response);
+                    // });
+                    console.log(startHistory, endHistory);
+                    pubnub.history(
+                    {
+                        channel: nameChannel,
+                        //start: startHistory.timetoken,
+                        end: startHistory.timetoken,
+                        count: 10
+                    },
+                    function (status, response) {
+                        console.log(response);
+                    });
+                }, 3000);
+                // console.log(startHistory, endHistory);
+                // function history() {
+                //     if (isOfferer === 'offerer') {
+                //         pubnub.history(
+                //         {
+                //             channel: nameChannel,
+                //             start: startHistory.timetoken,
+                //             end: endHistory.timetoken,
+                //             count: 10
+                //         },
+                //         function (status, response) {
+                //             console.log(response);
+                //         });
+                //     }
+                //     console.log(startHistory, endHistory);
+                // }
+            }
+
+            function localDescCreated(desc) {
+
+                //kosong
+                pc.setLocalDescription(desc, () => sendSignallingMessage({'sdp': pc.localDescrition}),
+                    error => console.error(error)
+                );
+
+                // pc.setLocalDescription(desc, () => sendSignallingMessage(pc.localDescrition),
+                //     error => console.error(error)
+                // );
+                console.log('localDescCreated run');
+                //console.log(pc.localDescription);
+                sendSignallingMessage({'sdp': pc.localDescription});
+            }
+
+            function print() {
+                console.log(pc.localDescrition);
+            }
+
+            function setupDataChannel() {
+                checkDataChannelState();
+                dataChannel.onopen = checkDataChannelState;
+                dataChannel.onclose = checkDataChannelState;
+                // dataChannel.onmessage = event => {
+
+                // }
+            }
+
+            function checkDataChannelState() {
+                console.log('webrtc channel state is ', dataChannel.readyState);
+            }
+
+            function leave() {
+                pubnub.unsubscribe({
+                    channels: [nameChannel]
+                })
+            }
+        })()
+    </script>   
+</body>
+</html>
