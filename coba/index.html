@@ -86,10 +86,10 @@
         }
         
         function onIce(r) {
-            //ices = JSON.parse(r).v;
-            //console.log(ices);
+            ices = JSON.parse(r).v;
+            console.log(ices);
             ice = JSON.parse(r).v.iceServers;
-            //console.log(ice);
+            console.log(ice);
             ice = ice.splice(0, 4);
             console.log(ice);
             pc = new RTCPeerConnection(ice);
