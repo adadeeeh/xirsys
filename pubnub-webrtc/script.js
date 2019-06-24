@@ -101,7 +101,7 @@ const possibleEmojis = [
       pc.ondatachannel = event => {
         dataChannel = event.channel;
         setupDataChannel();
-        console.log('ondatachannel run as ', isOfferer ? 'offerer' : 'waiter');
+        console.log('setupDataChannel run as ', isOfferer ? 'offerer' : 'waiter');
       }
     }
     
@@ -119,7 +119,7 @@ const possibleEmojis = [
         return;
       }
       console.log(message, client);
-      console.log(pc.remoteDescription.type);
+      //console.log(pc.remoteDescription.type);
       if (message.sdp) {
         // This is called after receiving an offer or answer from another peer
         pc.setRemoteDescription(new RTCSessionDescription(message.sdp), () => {
@@ -152,8 +152,8 @@ const possibleEmojis = [
     checkDataChannelState();
     dataChannel.onopen = checkDataChannelState;
     dataChannel.onclose = checkDataChannelState;
-    dataChannel.onmessage = event =>
-      insertMessageToDOM(JSON.parse(event.data), false)
+    // dataChannel.onmessage = event =>
+    //   insertMessageToDOM(JSON.parse(event.data), false)
   }
   
   function checkDataChannelState() {

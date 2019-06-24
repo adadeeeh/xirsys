@@ -15,12 +15,12 @@
     </div>
 
     <div>
-        Message: <input type="text" id="message">
+        Message: <input type="text" id="message" disabled>
         <button id="send-button" disabled>Send</button> Online <span id="totalOnline"></span>
     </div>
 
     <div>
-        <button id="leave-button">Leave</button>
+        <button id="leave-button" disabled>Leave</button>
         <button id="connect-button">Connect</button>
     </div>
 
@@ -104,6 +104,13 @@
                         // console.log('end adalah ' + endHistory);
                     }
                     if (msgEvent.message.sdp) {
+                        console.log(pc.signalingState);
+                        // if (pc.signalingState === 'stable') {
+                        //     break;
+                        // }
+                        // if (pc.signalingState === 'have-local-offer') {
+                        //     break;
+                        // }
                         pc.setRemoteDescription(new RTCSessionDescription(msgEvent.message.sdp), () => {
                             console.log('pc.remoteDescription.type', pc.remoteDescription.type);
                             if (pc.remoteDescription.type === 'offer') {
@@ -133,6 +140,14 @@
                         // const isOfferer = presenceEvent.occupancy === 2;
                         // startWebRTC(isOfferer);
                     }
+                    if (presenceEvent.action === 'leave' || presenceEvent.action === 'timeout') {
+                        if (presenceEvent.occupancy < 2) {
+                            document.getElementById('message').disabled = true;
+                            document.getElementById('send-button').disabled = true;
+                        }
+                    }
+                    baruOnline = presenceEvent.occupancy;
+                    document.getElementById('totalOnline').innerHTML = baruOnline;
                 },
                 status: function(statusEvent) {
                     if (statusEvent.category === 'PNConnectedCategory') {
@@ -144,12 +159,16 @@
                         localStorage.removeItem(subKey + 'uuid');
                         localStorage.removeItem('profileName');
                         localStorage.removeItem('profileExist');
-                        window.location = 'login3.html';
+                        window.location = 'index.html';
+                        document.getElementById('leave-button').disabled = true;
+                        document.getElementById('connect-button').disabled = false;
                     }
                 }
             })
             
             function connect() {
+                document.getElementById('leave-button').disabled = false;
+                document.getElementById('connect-button').disabled = true;
                 pubnub.hereNow(
                     {
                         channels: [nameChannel]
@@ -269,13 +288,14 @@
                 dataChannel.onclose = checkDataChannelState;
                 dataChannel.onmessage = event => {
                     displayMessage(event.data);
-                    console.log(event, event.data);
+                    console.log(event);
                 }
             }
 
             function checkDataChannelState() {
                 console.log('WebRTC channel state is ', dataChannel.readyState);
                 if (dataChannel.readyState === 'open') {
+                    document.getElementById('message').disabled = false;
                     document.getElementById('send-button').disabled = false;
                 }
             }
@@ -288,7 +308,11 @@
 
             function send () {
                 var msgText = document.getElementById('message');
-                dataChannel.send(msgText.value);
+                var msg = msgText.value;
+                var sender = document.getElementById('name');
+                displayMessage('You said ' + msgText.value);
+                var data = name + ' said ' + msg;
+                dataChannel.send(data);
             }
 
             function displayMessage(message) {
