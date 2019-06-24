@@ -72,8 +72,6 @@ const possibleEmojis = [
   function startWebRTC(isOfferer) {
     console.log('Starting WebRTC in as', isOfferer ? 'offerer' : 'waiter');
     pc = new RTCPeerConnection(configuration);
-  
-    console.log(pc.localDescription);
 
     console.log(pc);
     // 'onicecandidate' notifies us whenever an ICE agent needs to deliver a
@@ -81,6 +79,7 @@ const possibleEmojis = [
     pc.onicecandidate = event => {
       if (event.candidate) {
         sendSignalingMessage({'candidate': event.candidate});
+        console.log('onicecandidate run as ', isOfferer ? 'offerer' : 'waiter');
       }
     };
   
@@ -93,6 +92,7 @@ const possibleEmojis = [
       // If user is offerer let them create a negotiation offer and set up the data channel
       pc.onnegotiationneeded = () => {
         pc.createOffer(localDescCreated, error => console.error(error));
+        console.log('creteOffer run as ', isOfferer ? 'offerer' : 'waiter');
       }
       dataChannel = pc.createDataChannel('chat');
       setupDataChannel();
@@ -101,6 +101,7 @@ const possibleEmojis = [
       pc.ondatachannel = event => {
         dataChannel = event.channel;
         setupDataChannel();
+        console.log('ondatachannel run as ', isOfferer ? 'offerer' : 'waiter');
       }
     }
     
@@ -111,11 +112,14 @@ const possibleEmojis = [
     // Listen to signaling data from Scaledrone
     room.on('data', (message, client) => {
       // Message was sent by us
-      console.log(message, client);
+      // console.log(message, client);
+
+      // error processing ice candidate and anonymous
       if (client.id === drone.clientId) {
         return;
       }
-      //console.log(pc.remoteDescription.type);
+      console.log(message, client);
+      console.log(pc.remoteDescription.type);
       if (message.sdp) {
         // This is called after receiving an offer or answer from another peer
         pc.setRemoteDescription(new RTCSessionDescription(message.sdp), () => {
@@ -148,8 +152,8 @@ const possibleEmojis = [
     checkDataChannelState();
     dataChannel.onopen = checkDataChannelState;
     dataChannel.onclose = checkDataChannelState;
-    // dataChannel.onmessage = event =>
-    //   insertMessageToDOM(JSON.parse(event.data), false)
+    dataChannel.onmessage = event =>
+      insertMessageToDOM(JSON.parse(event.data), false)
   }
   
   function checkDataChannelState() {

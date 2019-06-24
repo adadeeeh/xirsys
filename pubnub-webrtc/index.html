@@ -21,7 +21,7 @@
 
     <div>
         <button id="leave-button">Leave</button>
-        <button id="online-button" onclick="window.location.href = 'online.html';">Who's online?</button>
+        <button id="connect-button">Connect</button>
     </div>
 
     <div id="messages"></div>
@@ -29,19 +29,22 @@
     <script src="https://cdn.pubnub.com/sdk/javascript/pubnub.4.24.1.js"></script>
     <script>
         (function() {
-            var nameChannel = 'channel_2';
+            var nameChannel = 'channel_4';
             var subKey = 'sub-c-77245466-8b3d-11e9-9769-e24cdeae5ee1';
             var pubKey = 'pub-c-013deaf3-4b9e-4e36-9491-2267dc769f03';
             var myUuid = localStorage.getItem(subKey + 'uuid');
-            var totalOnline, baruOnline, isOfferer;
+            var totalOnline, baruOnline;
             var startHistory = 0;
             var endHistory = 0;
 
             var sendButton = document.querySelector("#send-button");
-            //sendButton.onclick = send;
+            sendButton.onclick = send;
 
             var leaveButton = document.querySelector('#leave-button');
             leaveButton.onclick = leave;
+
+            var connectButton = document.querySelector('#connect-button');
+            connectButton.onclick = connect;
 
             if (myUuid === null) {
                 //myUuid = PubNub.generateUUID();
@@ -82,17 +85,6 @@
                     message: msg
                 },
                 function(status, response) {
-                    //console.log(status, response);
-
-                    // get time history
-                    // if (startHistory === 0) {
-                    //     startHistory = response;
-                    //     console.log('start adalah ' + startHistory.timetoken);
-                    // }
-                    // if (response.timetoken > startHistory.timetoken) {
-                    //     endHistory = response;
-                    //     console.log('end adalah ' + endHistory.timetoken);
-                    // }
                 })
             }
 
@@ -100,47 +92,46 @@
                 message: function(msgEvent) {
                     // console.log(msgEvent);
                     console.log(msgEvent.message, msgEvent.publisher);
-                    if (localStorage.getItem(name) === msgEvent.publisher) {
+                    if (localStorage.getItem(name) === msgEvent.message.from) {
                         return;
                     }
                     if (startHistory === 0) {
                         startHistory = msgEvent.timetoken;
-                        console.log('start adalah ' + startHistory);
+                        // console.log('start adalah ' + startHistory);
                     }
                     if (msgEvent.timetoken > startHistory) {
                         endHistory = msgEvent.timetoken;
-                        console.log('end adalah ' + endHistory);
+                        // console.log('end adalah ' + endHistory);
                     }
-                    // if (msgEvent.message.sdp) {
-                    //     pc.setRemoteDescription(new RTCSessionDescription(msgEvent.message.sdp), () => {
-                    //         console.log('pc.remoteDescription.type', pc.remoteDescription.type);
-                    //         if (pc.remoteDescription.type === 'offer') {
-                    //             console.log('Answering offer');
-                    //             pc.createAnswer(localDescCreated, error => console.error(error));
-                    //         }
-                    //     }, error => console.error(error));
-                    // }
-                    // else if (msgEvent.message.candidate) {
-                    //     pc.addIceCandidate(new RTCIceCandidate(msgEvent.message.candidate));
-                    // }
-                    //console.log(pc.remoteDescription.type);
+                    if (msgEvent.message.sdp) {
+                        pc.setRemoteDescription(new RTCSessionDescription(msgEvent.message.sdp), () => {
+                            console.log('pc.remoteDescription.type', pc.remoteDescription.type);
+                            if (pc.remoteDescription.type === 'offer') {
+                                console.log('Answering offer');
+                                pc.createAnswer(localDescCreated, error => console.error(error));
+                            }
+                        }, error => console.error(error));
+                    }
+                    else if (msgEvent.message.candidate) {
+                        pc.addIceCandidate(new RTCIceCandidate(msgEvent.message.candidate));
+                    }
+                    // console.log(pc.remoteDescription.type);
                 },
                 presence: function(presenceEvent) {
                     if (presenceEvent.action === 'join') {
-                        console.log(presenceEvent.occupancy);
                         if (presenceEvent.occupancy >= 3) {
                             return alert('The room is full');
                         }
                         // if (presenceEvent.occupancy === 1) {
-                        //     isOfferer = 'waiter';
+                        //     isOfferer = false;
                         //     startWebRTC(isOfferer);
                         // }
                         // else {
-                        //     isOfferer = 'offerer';
+                        //     isOfferer = true;
                         //     startWebRTC(isOfferer);
                         // }
-                        isOfferer = presenceEvent.occupancy === 2;
-                        startWebRTC(isOfferer);
+                        // const isOfferer = presenceEvent.occupancy === 2;
+                        // startWebRTC(isOfferer);
                     }
                 },
                 status: function(statusEvent) {
@@ -157,24 +148,40 @@
                     }
                 }
             })
+            
+            function connect() {
+                pubnub.hereNow(
+                    {
+                        channels: [nameChannel]
+                    },
+                    function (status, response) {
+                        console.log(response.totalOccupancy);
+                        isOfferer = response.totalOccupancy === 2;
+                        startWebRTC(isOfferer);
+                    }
+                )
+            }
 
             function startWebRTC(isOfferer) {
                 console.log('Starting webrtc as ', isOfferer ? 'offerer' : 'waiter');
                 pc = new RTCPeerConnection(configuration);
 
                 console.log(pc);
-
-                // console.log(pc);
-                //console.log(pc.remoteDescription.sdp);
                 pc.onicecandidate = event => {
                     if (event.candidate) {
-                        sendSignallingMessage({'candidate': event.candidate});
+                        sendSignallingMessage({
+                            'candidate': event.candidate,
+                            'from': name
+                        });
                     }
+                    console.log('onicecandidate run as ', isOfferer ? 'offerer' : 'waiter');
                 };
 
                 if (isOfferer) {
                     pc.onnegotiationneeded = () => {
                         pc.createOffer(localDescCreated, error => console.error(error));
+                        console.log('creteOffer run as ', isOfferer ? 'offerer' : 'waiter');
+
                     }
                     dataChannel = pc.createDataChannel('chat');
                     setupDataChannel();
@@ -182,6 +189,7 @@
                     pc.ondatachannel = event => {
                         dataChannel = event.channel;
                         setupDataChannel();
+                        console.log('ondatachannel run as ', isOfferer ? 'offerer' : 'waiter');
                     }
                 }
 
@@ -190,59 +198,65 @@
 
             function startListeningToSignals() {
                 setTimeout(() => {
-                    // pubnub.history(
-                    // {
-                    //     channel: nameChannel,
-                    //     start: startHistory.timetoken,
-                    //     end: endHistory.timetoken,
-                    //     count: 10
-                    // },
-                    // function (status, response) {
-                    //     console.log(response);
-                    // });
-                    console.log(startHistory, endHistory);
-                    pubnub.history(
-                    {
-                        channel: nameChannel,
-                        //start: startHistory.timetoken,
-                        end: startHistory.timetoken,
-                        count: 10
-                    },
-                    function (status, response) {
-                        console.log(response);
-                    });
+                    
+                    pubnub.hereNow(
+                        {
+                            channels: [nameChannel]
+                        },
+                        function (status, response) {
+                            ttlOccupancy = 2;
+                            if (response.totalOccupancy === 2) {
+                                // console.log(startHistory, endHistory);
+                                // pubnub.history(
+                                // {
+                                //     channel: nameChannel,
+                                //     //start: endHistory.timetoken,
+                                //     end: startHistory,
+                                //     // count: 4
+                                // },
+                                // function (status, response) {
+                                //     console.log(status, response);
+                                //     response.messages.forEach(
+                                //         function(item) {
+                                //             if (item.entry.from === name) {
+                                //                 //console.log(item.entry.from, name);
+                                //                 return;
+                                //             }
+                                //             console.log(item.entry);
+                                //             if (item.entry.sdp) {
+                                //                 pc.setRemoteDescription(new RTCSessionDescription(item.entry.sdp), () => {
+                                //                     console.log('pc.remoteDescription.type', pc.remoteDescription.type);
+                                //                     if (pc.remoteDescription.type === 'offer') {
+                                //                         console.log('answering offer');
+                                //                         pc.createAnswer(localDescCreated, error => console.log(error));
+                                //                     }
+                                //                 }, error => console.log(error));
+                                //             }
+                                //             // else if (item.entry.candidate) {
+                                //             //     pc.addIceCandidate(new RTCIceCandidate(item.entry.candidate));
+                                //             // }
+                                //         }
+                                //     )
+                                // });
+                                // ttlOccupancy = 1;
+                                // // console.log(ttlOccupancy);
+                            }
+                        }
+                    )
+                    
                 }, 3000);
-                // console.log(startHistory, endHistory);
-                // function history() {
-                //     if (isOfferer === 'offerer') {
-                //         pubnub.history(
-                //         {
-                //             channel: nameChannel,
-                //             start: startHistory.timetoken,
-                //             end: endHistory.timetoken,
-                //             count: 10
-                //         },
-                //         function (status, response) {
-                //             console.log(response);
-                //         });
-                //     }
-                //     console.log(startHistory, endHistory);
-                // }
             }
 
             function localDescCreated(desc) {
-
-                //kosong
-                pc.setLocalDescription(desc, () => sendSignallingMessage({'sdp': pc.localDescrition}),
+                pc.setLocalDescription(
+                    desc,
+                    () => sendSignallingMessage({
+                        'sdp': pc.localDescription,
+                        'from': name
+                    }),
                     error => console.error(error)
                 );
-
-                // pc.setLocalDescription(desc, () => sendSignallingMessage(pc.localDescrition),
-                //     error => console.error(error)
-                // );
                 console.log('localDescCreated run');
-                //console.log(pc.localDescription);
-                sendSignallingMessage({'sdp': pc.localDescription});
             }
 
             function print() {
@@ -253,13 +267,17 @@
                 checkDataChannelState();
                 dataChannel.onopen = checkDataChannelState;
                 dataChannel.onclose = checkDataChannelState;
-                // dataChannel.onmessage = event => {
-
-                // }
+                dataChannel.onmessage = event => {
+                    displayMessage(event.data);
+                    console.log(event, event.data);
+                }
             }
 
             function checkDataChannelState() {
-                console.log('webrtc channel state is ', dataChannel.readyState);
+                console.log('WebRTC channel state is ', dataChannel.readyState);
+                if (dataChannel.readyState === 'open') {
+                    document.getElementById('send-button').disabled = false;
+                }
             }
 
             function leave() {
@@ -267,7 +285,17 @@
                     channels: [nameChannel]
                 })
             }
+
+            function send () {
+                var msgText = document.getElementById('message');
+                dataChannel.send(msgText.value);
+            }
+
+            function displayMessage(message) {
+                document.getElementById('messages').innerHTML += message + '<br>';
+            }
         })()
     </script>   
 </body>
 </html>
+
