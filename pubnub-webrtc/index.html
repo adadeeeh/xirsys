@@ -45,13 +45,13 @@
 
     <div id="messages"></div>
 
-    <!-- <video id="localVideo" autoplay muted></video>
-    <video id="remoteVideo" autoplay></video> -->
+    <video id="localVideo" autoplay muted></video>
+    <video id="remoteVideo" autoplay></video>
 
     <script src="https://cdn.pubnub.com/sdk/javascript/pubnub.4.24.1.js"></script>
     <script>
         (function() {
-            var nameChannel = 'channel_5';
+            var nameChannel = 'channel_29';
             var subKey = 'sub-c-77245466-8b3d-11e9-9769-e24cdeae5ee1';
             var pubKey = 'pub-c-013deaf3-4b9e-4e36-9491-2267dc769f03';
             var myUuid = localStorage.getItem(subKey + 'uuid');
@@ -68,7 +68,10 @@
             var connectButton = document.querySelector('#connect-button');
             connectButton.onclick = connect;
 
-            if (myUuid === null) {
+            var name = window.location.search.substring(1).split('=')[1];
+            localStorage.setItem('name', name);
+
+            if (myUuid === null && name === null) {
                 //myUuid = PubNub.generateUUID();
                 //console.log(myUuid);
                 var name = prompt('Enter your name');
@@ -84,7 +87,7 @@
             }
 
             window.onload = () => {
-                $.post("http://localhost/coba/getice.php", null, r => onIce(r));
+                $.post("http://192.168.1.39/xirsys/pubnub-webrtc/getice.php", null, r => onIce(r));
             }
             
             function onIce(r) {
@@ -122,7 +125,7 @@
             pubnub.addListener({
                 message: function(msgEvent) {
                     // console.log(msgEvent);
-                    console.log(msgEvent.message, msgEvent.publisher);
+                    // console.log(msgEvent.message, msgEvent.publisher);
                     if (localStorage.getItem(name) === msgEvent.message.from) {
                         return;
                     }
@@ -135,18 +138,13 @@
                         // console.log('end adalah ' + endHistory);
                     }
                     if (msgEvent.message.sdp) {
-                        console.log(pc.signalingState);
-                        // if (pc.signalingState === 'stable') {
-                        //     break;
-                        // }
-                        // if (pc.signalingState === 'have-local-offer') {
-                        //     break;
-                        // }
+                        // console.log(pc.signalingState);
                         pc.setRemoteDescription(new RTCSessionDescription(msgEvent.message.sdp), () => {
-                            console.log('pc.remoteDescription.type', pc.remoteDescription.type);
+                            // console.log('pc.remoteDescription.type', pc.remoteDescription.type);
                             if (pc.remoteDescription.type === 'offer') {
                                 console.log('Answering offer');
                                 pc.createAnswer(localDescCreated, error => console.error(error));
+                                // pc.creatAnswer().then(localDescCreated).catch(onError);
                             }
                         }, error => console.error(error));
                     }
@@ -160,16 +158,6 @@
                         if (presenceEvent.occupancy >= 3) {
                             return alert('The room is full');
                         }
-                        // if (presenceEvent.occupancy === 1) {
-                        //     isOfferer = false;
-                        //     startWebRTC(isOfferer);
-                        // }
-                        // else {
-                        //     isOfferer = true;
-                        //     startWebRTC(isOfferer);
-                        // }
-                        // const isOfferer = presenceEvent.occupancy === 2;
-                        // startWebRTC(isOfferer);
                     }
                     if (presenceEvent.action === 'leave' || presenceEvent.action === 'timeout') {
                         if (presenceEvent.occupancy < 2) {
@@ -190,7 +178,7 @@
                         localStorage.removeItem(subKey + 'uuid');
                         localStorage.removeItem('profileName');
                         localStorage.removeItem('profileExist');
-                        window.location = 'index.html';
+                        window.location = 'login.html';
                         document.getElementById('leave-button').disabled = true;
                         document.getElementById('connect-button').disabled = false;
                     }
@@ -205,7 +193,7 @@
                         channels: [nameChannel]
                     },
                     function (status, response) {
-                        console.log(response.totalOccupancy);
+                        // console.log(response.totalOccupancy);
                         isOfferer = response.totalOccupancy === 2;
                         startWebRTC(isOfferer);
                     }
@@ -216,7 +204,7 @@
                 console.log('Starting webrtc as ', isOfferer ? 'offerer' : 'waiter');
                 pc = new RTCPeerConnection(ice);
 
-                console.log(pc);
+                // console.log(pc);
                 pc.onicecandidate = event => {
                     if (event.candidate) {
                         sendSignallingMessage({
@@ -224,14 +212,40 @@
                             'from': name
                         });
                     }
-                    console.log('onicecandidate run as ', isOfferer ? 'offerer' : 'waiter');
+                    // console.log('onicecandidate run as ', isOfferer ? 'offerer' : 'waiter');
                 };
+
+                function onSuccess() {};
+                function onError(error) {
+                    console.error(error);
+                };
+
+                // pc.onaddstream = event => {
+                //     remoteVideo.srcObject = event.stream;
+                // };
+
+                pc.ontrack = event => {
+                    var stream = event.streams[0];
+                    if (!remoteVideo.srcObject || remoteVideo.srcObject.id !== stream.id) {
+                        remoteVideo.srcObject = stream;
+                    }
+                };
+
+                navigator.mediaDevices.getUserMedia({
+                    audio: true,
+                    video: true,
+                }).then(stream => {
+                    // Display your local video in #localVideo element
+                    localVideo.srcObject = stream;
+                    // Add your stream to be sent to the conneting peer
+                    stream.getTracks().forEach(track => pc.addTrack(track, stream));
+                }, onError);
 
                 if (isOfferer) {
                     pc.onnegotiationneeded = () => {
                         pc.createOffer(localDescCreated, error => console.error(error));
-                        console.log('creteOffer run as ', isOfferer ? 'offerer' : 'waiter');
-
+                        // console.log('creteOffer run as ', isOfferer ? 'offerer' : 'waiter');
+                        // pc.createOffer().then(localDescCreated).catch(onError);
                     }
                     dataChannel = pc.createDataChannel('chat');
                     setupDataChannel();
@@ -239,84 +253,11 @@
                     pc.ondatachannel = event => {
                         dataChannel = event.channel;
                         setupDataChannel();
-                        console.log('ondatachannel run as ', isOfferer ? 'offerer' : 'waiter');
+                        // console.log('ondatachannel run as ', isOfferer ? 'offerer' : 'waiter');
                     }
                 }
 
-                // function onSuccess() {};
-                // function onError(error) {
-                //     console.error(error);
-                // };
-
-                // pc.ontrack = event => {
-                //     var stream = event.streams[0];
-                //     if (!remoteVideo.srcObject || remoteVideo.srcObject.id !== stream.id) {
-                //         remoteVideo.srcObject = stream;
-                //     }
-                // };
-
-                // navigator.mediaDevices.getUserMedia({
-                //     audio: true,
-                //     video: true,
-                // }).then(stream => {
-                //     // Display your local video in #localVideo element
-                //     localVideo.srcObject = stream;
-                //     // Add your stream to be sent to the conneting peer
-                //     stream.getTracks().forEach(track => pc.addTrack(track, stream));
-                // }, onError);
-
-                startListeningToSignals();
-            }
-
-            function startListeningToSignals() {
-                setTimeout(() => {
-                    
-                    pubnub.hereNow(
-                        {
-                            channels: [nameChannel]
-                        },
-                        function (status, response) {
-                            ttlOccupancy = 2;
-                            if (response.totalOccupancy === 2) {
-                                // console.log(startHistory, endHistory);
-                                // pubnub.history(
-                                // {
-                                //     channel: nameChannel,
-                                //     //start: endHistory.timetoken,
-                                //     end: startHistory,
-                                //     // count: 4
-                                // },
-                                // function (status, response) {
-                                //     console.log(status, response);
-                                //     response.messages.forEach(
-                                //         function(item) {
-                                //             if (item.entry.from === name) {
-                                //                 //console.log(item.entry.from, name);
-                                //                 return;
-                                //             }
-                                //             console.log(item.entry);
-                                //             if (item.entry.sdp) {
-                                //                 pc.setRemoteDescription(new RTCSessionDescription(item.entry.sdp), () => {
-                                //                     console.log('pc.remoteDescription.type', pc.remoteDescription.type);
-                                //                     if (pc.remoteDescription.type === 'offer') {
-                                //                         console.log('answering offer');
-                                //                         pc.createAnswer(localDescCreated, error => console.log(error));
-                                //                     }
-                                //                 }, error => console.log(error));
-                                //             }
-                                //             // else if (item.entry.candidate) {
-                                //             //     pc.addIceCandidate(new RTCIceCandidate(item.entry.candidate));
-                                //             // }
-                                //         }
-                                //     )
-                                // });
-                                // ttlOccupancy = 1;
-                                // // console.log(ttlOccupancy);
-                            }
-                        }
-                    )
-                    
-                }, 3000);
+                
             }
 
             function localDescCreated(desc) {
@@ -341,7 +282,7 @@
                 dataChannel.onclose = checkDataChannelState;
                 dataChannel.onmessage = event => {
                     displayMessage(event.data);
-                    console.log(event);
+                    // console.log(event);
                 }
             }
 
@@ -350,6 +291,8 @@
                 if (dataChannel.readyState === 'open') {
                     document.getElementById('message').disabled = false;
                     document.getElementById('send-button').disabled = false;
+                    
+
                 }
             }
 
