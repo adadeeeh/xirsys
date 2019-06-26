@@ -234,10 +234,23 @@
                     }
                 };
 
-                // function onSuccess() {};
-                // function onError(error) {
-                //     console.error(error);
-                // };
+                function onSuccess() {};
+                function onError(error) {
+                    console.error(error);
+                };
+
+                if (isOfferer) {
+                    pc.onnegotiationneeded = () => {
+                        pc.createOffer(localDescCreated, error => console.error(error));
+                    }
+                    dataChannel = pc.createDataChannel('chat');
+                    setupDataChannel();
+                } else {
+                    pc.ondatachannel = event => {
+                        dataChannel = event.channel;
+                        setupDataChannel();
+                    }
+                }
 
                 // pc.ontrack = event => {
                 //     var stream = event.streams[0];
@@ -255,19 +268,6 @@
                 //     // Add your stream to be sent to the conneting peer
                 //     stream.getTracks().forEach(track => pc.addTrack(track, stream));
                 // }, onError);
-
-                if (isOfferer) {
-                    pc.onnegotiationneeded = () => {
-                        pc.createOffer(localDescCreated, error => console.error(error));
-                    }
-                    dataChannel = pc.createDataChannel('chat');
-                    setupDataChannel();
-                } else {
-                    pc.ondatachannel = event => {
-                        dataChannel = event.channel;
-                        setupDataChannel();
-                    }
-                }
 
                 startListeningToSignals();
             }
@@ -291,7 +291,7 @@
                                         if (item.entry.from === name) {
                                             return;
                                         }
-                                        console.log(item.entry);
+                                        // console.log(item.entry);
                                         if (item.entry.sdp) {
                                             pc.setRemoteDescription(new RTCSessionDescription(item.entry.sdp), () => {
                                                 console.log('pc.remoteDescription.type', pc.remoteDescription.type);
@@ -306,6 +306,27 @@
                                         }
                                     }
                                 )
+                                function onSuccess() {};
+                                function onError(error) {
+                                    console.error(error);
+                                };
+                                pc.ontrack = event => {
+                                    var stream = event.streams[0];
+                                    if (!remoteVideo.srcObject || remoteVideo.srcObject.id !== stream.id) {
+                                        remoteVideo.srcObject = stream;
+                                    }
+                                };
+
+                                navigator.mediaDevices.getUserMedia({
+                                    audio: true,
+                                    video: true,
+                                }).then(stream => {
+                                    // Display your local video in #localVideo element
+                                    localVideo.srcObject = stream;
+                                    // Add your stream to be sent to the conneting peer
+                                    stream.getTracks().forEach(track => pc.addTrack(track, stream));
+                                }, onError);
+
                             });
                         }
                     }
@@ -336,6 +357,27 @@
                                 }
                             }
                         )
+                        function onSuccess() {};
+                        function onError(error) {
+                            console.error(error);
+                        };
+                        pc.ontrack = event => {
+                            var stream = event.streams[0];
+                            if (!remoteVideo.srcObject || remoteVideo.srcObject.id !== stream.id) {
+                                remoteVideo.srcObject = stream;
+                            }
+                        };
+
+                        navigator.mediaDevices.getUserMedia({
+                            audio: true,
+                            video: true,
+                        }).then(stream => {
+                            // Display your local video in #localVideo element
+                            localVideo.srcObject = stream;
+                            // Add your stream to be sent to the conneting peer
+                            stream.getTracks().forEach(track => pc.addTrack(track, stream));
+                        }, onError);
+
                     });
                 }, 10000); 
                               
