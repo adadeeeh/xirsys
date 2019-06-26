@@ -142,21 +142,21 @@
                     }
 
                     // signaling per pesan
-                    // if (msgEvent.message.sdp) {
-                    //     // console.log(pc.signalingState);
-                    //     pc.setRemoteDescription(new RTCSessionDescription(msgEvent.message.sdp), () => {
-                    //         // console.log('pc.remoteDescription.type', pc.remoteDescription.type);
-                    //         if (pc.remoteDescription.type === 'offer') {
-                    //             console.log('Answering offer');
-                    //             pc.createAnswer(localDescCreated, error => console.error(error));
-                    //             // pc.creatAnswer().then(localDescCreated).catch(onError);
-                    //         }
-                    //     }, error => console.error(error));
-                    // }
-                    // else if (msgEvent.message.candidate) {
-                    //     pc.addIceCandidate(new RTCIceCandidate(msgEvent.message.candidate));
-                    // }
-                    // console.log(pc.remoteDescription.type);
+                    if (msgEvent.message.sdp) {
+                        // console.log(pc.signalingState);
+                        pc.setRemoteDescription(new RTCSessionDescription(msgEvent.message.sdp), () => {
+                            // console.log('pc.remoteDescription.type', pc.remoteDescription.type);
+                            if (pc.remoteDescription.type === 'offer') {
+                                console.log('Answering offer');
+                                pc.createAnswer(localDescCreated, error => console.error(error));
+                                // pc.creatAnswer().then(localDescCreated).catch(onError);
+                            }
+                        }, error => console.error(error));
+                    }
+                    else if (msgEvent.message.candidate) {
+                        pc.addIceCandidate(new RTCIceCandidate(msgEvent.message.candidate));
+                    }
+                    console.log(pc.remoteDescription.type);
                 },
                 presence: function(presenceEvent) {
                     if (presenceEvent.action === 'join') {
@@ -222,7 +222,7 @@
 
             function startWebRTC(isOfferer) {
                 console.log('Starting webrtc as ', isOfferer ? 'offerer' : 'waiter');
-                pc = new RTCPeerConnection(ice);
+                pc = new RTCPeerConnection(configuration);
 
                 // console.log(pc);
                 pc.onicecandidate = event => {
@@ -232,11 +232,6 @@
                             'from': name
                         });
                     }
-                };
-
-                function onSuccess() {};
-                function onError(error) {
-                    console.error(error);
                 };
 
                 if (isOfferer) {
@@ -251,6 +246,11 @@
                         setupDataChannel();
                     }
                 }
+
+                // function onSuccess() {};
+                // function onError(error) {
+                //     console.error(error);
+                // };
 
                 // pc.ontrack = event => {
                 //     var stream = event.streams[0];
@@ -269,119 +269,119 @@
                 //     stream.getTracks().forEach(track => pc.addTrack(track, stream));
                 // }, onError);
 
-                startListeningToSignals();
+                //startListeningToSignals();
             }
 
-            function startListeningToSignals() {
-                //signaling per seluruh pesan
-                pubnub.hereNow(
-                    {
-                        channels: [nameChannel]
-                    },
-                    function (status, response) {
-                        if (isOfferer) {
-                            pubnub.history(
-                            {
-                                channel: nameChannel,
-                                end: startHistory,
-                            },
-                            function (status, response) {
-                                response.messages.forEach(
-                                    function(item) {
-                                        if (item.entry.from === name) {
-                                            return;
-                                        }
-                                        // console.log(item.entry);
-                                        if (item.entry.sdp) {
-                                            pc.setRemoteDescription(new RTCSessionDescription(item.entry.sdp), () => {
-                                                console.log('pc.remoteDescription.type', pc.remoteDescription.type);
-                                                if (pc.remoteDescription.type === 'offer') {
-                                                    console.log('answering offer');
-                                                    pc.createAnswer(localDescCreated, error => console.log(error));
-                                                }
-                                            }, error => console.log(error));
-                                        }
-                                        else if (item.entry.candidate) {
-                                            pc.addIceCandidate(new RTCIceCandidate(item.entry.candidate));
-                                        }
-                                    }
-                                )
-                                function onSuccess() {};
-                                function onError(error) {
-                                    console.error(error);
-                                };
-                                pc.ontrack = event => {
-                                    var stream = event.streams[0];
-                                    if (!remoteVideo.srcObject || remoteVideo.srcObject.id !== stream.id) {
-                                        remoteVideo.srcObject = stream;
-                                    }
-                                };
+            // function startListeningToSignals() {
+            //     //signaling per seluruh pesan
+            //     pubnub.hereNow(
+            //         {
+            //             channels: [nameChannel]
+            //         },
+            //         function (status, response) {
+            //             if (isOfferer) {
+            //                 pubnub.history(
+            //                 {
+            //                     channel: nameChannel,
+            //                     end: startHistory,
+            //                 },
+            //                 function (status, response) {
+            //                     response.messages.forEach(
+            //                         function(item) {
+            //                             if (item.entry.from === name) {
+            //                                 return;
+            //                             }
+            //                             // console.log(item.entry);
+            //                             if (item.entry.sdp) {
+            //                                 pc.setRemoteDescription(new RTCSessionDescription(item.entry.sdp), () => {
+            //                                     console.log('pc.remoteDescription.type', pc.remoteDescription.type);
+            //                                     if (pc.remoteDescription.type === 'offer') {
+            //                                         console.log('answering offer');
+            //                                         pc.createAnswer(localDescCreated, error => console.log(error));
+            //                                     }
+            //                                 }, error => console.log(error));
+            //                             }
+            //                             else if (item.entry.candidate) {
+            //                                 pc.addIceCandidate(new RTCIceCandidate(item.entry.candidate));
+            //                             }
+            //                         }
+            //                     )
+            //                     function onSuccess() {};
+            //                     function onError(error) {
+            //                         console.error(error);
+            //                     };
+            //                     pc.ontrack = event => {
+            //                         var stream = event.streams[0];
+            //                         if (!remoteVideo.srcObject || remoteVideo.srcObject.id !== stream.id) {
+            //                             remoteVideo.srcObject = stream;
+            //                         }
+            //                     };
 
-                                navigator.mediaDevices.getUserMedia({
-                                    audio: true,
-                                    video: true,
-                                }).then(stream => {
-                                    // Display your local video in #localVideo element
-                                    localVideo.srcObject = stream;
-                                    // Add your stream to be sent to the conneting peer
-                                    stream.getTracks().forEach(track => pc.addTrack(track, stream));
-                                }, onError);
+            //                     navigator.mediaDevices.getUserMedia({
+            //                         audio: true,
+            //                         video: true,
+            //                     }).then(stream => {
+            //                         // Display your local video in #localVideo element
+            //                         localVideo.srcObject = stream;
+            //                         // Add your stream to be sent to the conneting peer
+            //                         stream.getTracks().forEach(track => pc.addTrack(track, stream));
+            //                     }, onError);
 
-                            });
-                        }
-                    }
-                )
-                setTimeout(() => {
-                    pubnub.history(
-                    {
-                        channel: nameChannel,
-                        end: startHistory,
-                    },
-                    function (status, response) {
-                        response.messages.forEach(
-                            function(item) {
-                                if (item.entry.from === name) {
-                                    return;
-                                }
-                                if (item.entry.sdp) {
-                                    pc.setRemoteDescription(new RTCSessionDescription(item.entry.sdp), () => {
-                                        console.log('pc.remoteDescription.type', pc.remoteDescription.type);
-                                        if (pc.remoteDescription.type === 'offer') {
-                                            console.log('answering offer');
-                                            pc.createAnswer(localDescCreated, error => console.log(error));
-                                        }
-                                    }, error => console.log(error));
-                                }
-                                else if (item.entry.candidate) {
-                                    pc.addIceCandidate(new RTCIceCandidate(item.entry.candidate));
-                                }
-                            }
-                        )
-                        function onSuccess() {};
-                        function onError(error) {
-                            console.error(error);
-                        };
-                        pc.ontrack = event => {
-                            var stream = event.streams[0];
-                            if (!remoteVideo.srcObject || remoteVideo.srcObject.id !== stream.id) {
-                                remoteVideo.srcObject = stream;
-                            }
-                        };
+            //                 });
+            //             }
+            //         }
+            //     )
+            //     setTimeout(() => {
+            //         pubnub.history(
+            //         {
+            //             channel: nameChannel,
+            //             end: startHistory,
+            //         },
+            //         function (status, response) {
+            //             response.messages.forEach(
+            //                 function(item) {
+            //                     if (item.entry.from === name) {
+            //                         return;
+            //                     }
+            //                     if (item.entry.sdp) {
+            //                         pc.setRemoteDescription(new RTCSessionDescription(item.entry.sdp), () => {
+            //                             console.log('pc.remoteDescription.type', pc.remoteDescription.type);
+            //                             if (pc.remoteDescription.type === 'offer') {
+            //                                 console.log('answering offer');
+            //                                 pc.createAnswer(localDescCreated, error => console.log(error));
+            //                             }
+            //                         }, error => console.log(error));
+            //                     }
+            //                     else if (item.entry.candidate) {
+            //                         pc.addIceCandidate(new RTCIceCandidate(item.entry.candidate));
+            //                     }
+            //                 }
+            //             )
+            //             function onSuccess() {};
+            //             function onError(error) {
+            //                 console.error(error);
+            //             };
+            //             pc.ontrack = event => {
+            //                 var stream = event.streams[0];
+            //                 if (!remoteVideo.srcObject || remoteVideo.srcObject.id !== stream.id) {
+            //                     remoteVideo.srcObject = stream;
+            //                 }
+            //             };
 
-                        navigator.mediaDevices.getUserMedia({
-                            audio: true,
-                            video: true,
-                        }).then(stream => {
-                            // Display your local video in #localVideo element
-                            localVideo.srcObject = stream;
-                            // Add your stream to be sent to the conneting peer
-                            stream.getTracks().forEach(track => pc.addTrack(track, stream));
-                        }, onError);
+            //             navigator.mediaDevices.getUserMedia({
+            //                 audio: true,
+            //                 video: true,
+            //             }).then(stream => {
+            //                 // Display your local video in #localVideo element
+            //                 localVideo.srcObject = stream;
+            //                 // Add your stream to be sent to the conneting peer
+            //                 stream.getTracks().forEach(track => pc.addTrack(track, stream));
+            //             }, onError);
 
-                    });
-                }, 10000); 
+            //         });
+            //     }, 10000); 
                               
-            }
+            // }
 
             function localDescCreated(desc) {
                 pc.setLocalDescription(
